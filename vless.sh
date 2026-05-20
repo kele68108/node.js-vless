@@ -10,12 +10,16 @@ PLAIN="\033[0m"
 UUID="5f9a69bb-7dfd-46ba-9f86-1a6a5643d9de"
 WSPATH="kele666"
 APP_DIR="/opt/vless-proxy"
+LOG_FILE="/var/log/vless_install.log"
 
 # 确保脚本以 root 权限运行
 if [ "$(id -u)" != "0" ]; then
     echo -e "${RED}错误: 请以 root 权限运行此脚本 (例如使用 sudo -i 切换)${PLAIN}"
     exit 1
 fi
+
+# 初始化/清空之前的日志
+> $LOG_FILE
 
 # ==================== 安装功能 ====================
 function install_vless() {
@@ -27,17 +31,29 @@ function install_vless() {
         exit 1
     fi
 
-    echo "正在检查并安装 Node.js 与基础组件..."
-    apt-get update -y >/dev/null 2>&1
-    apt-get install -y curl >/dev/null 2>&1
+    echo -e "${YELLOW}提示: 安装日志将实时打印，并自动保存在 ${LOG_FILE}${PLAIN}"
+    echo "==========================================" | tee -a $LOG_FILE
+    
+    echo "正在检查并安装基础组件 (curl)..." | tee -a $LOG_FILE
+    apt-get update -y 2>&1 | tee -a $LOG_FILE
+    apt-get install -y curl 2>&1 | tee -a $LOG_FILE
 
     if ! command -v node >/dev/null 2>&1; then
-        echo "未检测到 Node.js，正在通过 NodeSource 安装..."
-        curl -fsSL https://deb.nodesource.com/setup_18.x | bash - >/dev/null 2>&1
-        apt-get install -y nodejs >/dev/null 2>&1
+        echo -e "${YELLOW}未检测到 Node.js，正在通过 NodeSource 下载并安装... (如果此处卡住，请检查 VPS 的网络或 DNS)${PLAIN}" | tee -a $LOG_FILE
+        # 移除静默模式，将错误和输出全部展示出来
+        curl -fsSL https://deb.nodesource.com/setup_18.x | bash - 2>&1 | tee -a $LOG_FILE
+        apt-get install -y nodejs 2>&1 | tee -a $LOG_FILE
+    else
+        echo "检测到 Node.js 已安装: $(node -v)" | tee -a $LOG_FILE
     fi
 
-    echo "正在精简代码并写入配置..."
+    # 再次验证 Node.js 是否安装成功
+    if ! command -v node >/dev/null 2>&1; then
+        echo -e "${RED}致命错误: Node.js 安装失败！请查看上方的错误日志。${PLAIN}" | tee -a $LOG_FILE
+        exit 1
+    fi
+
+    echo "正在精简代码并写入配置..." | tee -a $LOG_FILE
     mkdir -p $APP_DIR
     cd $APP_DIR
 
@@ -154,10 +170,10 @@ httpServer.listen(PORT, () => {
 });
 EOF
 
-    echo "正在安装 WebSocket 依赖..."
-    npm install >/dev/null 2>&1
+    echo "正在安装 WebSocket 依赖 (npm install)..." | tee -a $LOG_FILE
+    npm install --no-fund --no-audit 2>&1 | tee -a $LOG_FILE
 
-    echo "正在配置 systemd 守护进程..."
+    echo "正在配置 systemd 守护进程..." | tee -a $LOG_FILE
     cat > /etc/systemd/system/vless-proxy.service <<EOF
 [Unit]
 Description=VLESS Proxy Node Service
@@ -176,7 +192,7 @@ WantedBy=multi-user.target
 EOF
 
     systemctl daemon-reload
-    systemctl enable vless-proxy >/dev/null 2>&1
+    systemctl enable vless-proxy 2>&1 | tee -a $LOG_FILE
     systemctl restart vless-proxy
 
     # 设置快捷键指令
