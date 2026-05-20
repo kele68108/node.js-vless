@@ -1,5 +1,5 @@
-wget https://raw.githubusercontent.com/kele68108/sap-bas-x-tunnel/refs/heads/main/start.sh
+wget https://raw.githubusercontent.com/kele68108/node.js-vless/refs/heads/main/vless.sh
 
-chmod +x start.sh
+chmod +x vless.sh
 
-./start.sh
+./vless.sh
